@@ -77,3 +77,5 @@ venv/
 build/
 dist/
 bin/
+
+Miniconda3-latest-MacOSX-arm64.sh
