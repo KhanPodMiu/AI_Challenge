@@ -16,16 +16,19 @@ if str(parent_dir) not in sys.path:
 
 from engine import BomberEnv
 from agent import RandomAgent, SimpleRuleAgent, SmarterRuleAgent, TacticalRuleAgent, GeniusRuleAgent, BoxFarmerAgent
-from training import encode_obs, DQNAgent, DQfDAgent
-from training.SQIL import encode_obs as sqil_encode_obs
-from training.bc_ppo_lstm import BC_PPO_LSTM_Agent, is_bc_ppo_lstm_checkpoint
-from training.bc_ppo_lstm_attn_selfplay import ActorCriticAttnLSTM
+try:
+    from training import encode_obs, DQNAgent, DQfDAgent
+    from training.SQIL import encode_obs as sqil_encode_obs
+    from training.bc_ppo_lstm import BC_PPO_LSTM_Agent, is_bc_ppo_lstm_checkpoint
+    from training.bc_ppo_lstm_attn_selfplay import ActorCriticAttnSelfplay
+except:
+    pass
 from competition.evaluation.runtime_guard import load_agent_instance
 
 class Viewer:
 	PLAYER_COLORS = [(220, 50, 50), (50, 50, 220), (30, 150, 30), (200, 140, 0)]
 
-	def __init__(self, width=13, height=13, cell_size=42, fps=8, panel_width=200):
+	def __init__(self, width=13, height=13, cell_size=42, fps=4, panel_width=200):
 		self.width = width
 		self.height = height
 		self.cell_size = cell_size
