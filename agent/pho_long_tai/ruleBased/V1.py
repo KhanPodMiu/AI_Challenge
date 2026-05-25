@@ -15,15 +15,7 @@ class Agent:
 
     def __init__(self, agent_id):
         self.agent_id = int(agent_id)
-
-    def bfs(self, grid, start, goal):
-        pass
-
-    def dfs(self, grid, start, goal):
-        pass
     
-
-
     def act(self, obs):
 
     
@@ -359,3 +351,7 @@ class Agent:
         )
 
         return move is not None
+    
+    def bfs(self, grid, start, targets, danger):
+       return 1
+    
