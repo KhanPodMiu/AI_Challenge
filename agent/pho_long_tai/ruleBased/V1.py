@@ -359,3 +359,6 @@ class Agent:
         )
 
         return move is not None
+    
+    def bfs(self, grid, start, goal):
+        return 1
