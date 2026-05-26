@@ -474,7 +474,7 @@ def simulate_episodes(agent_paths, num_episodes=10, max_steps=500, seed=None, mo
 					action = 0
 				actions.append(action)
 				
-			obs, terminated, truncated = env.step(actions)
+			obs, rewards, terminated, truncated = env.step(actions)
 			trajectory.append(clone_obs(obs))
 			done = terminated or truncated
 			step += 1

@@ -135,8 +135,25 @@ class BomberEnv:
         
         terminated = sum(p.alive for p in self.players) <= 1
         truncated = self.current_step >= self.max_steps
+
+        rewards = [0.0 for _ in self.players]
+
+        for i, player in enumerate(self.players):
+            if player.alive:
+                rewards[i] += 0.01
+
+        for i, player in enumerate(self.players):
+
+            rewards[i] += player.stats['boxes'] * 1.0
+
+            rewards[i] += player.stats['items'] * 2.0
+
+            rewards[i] += player.stats['kills'] * 10.0
+
+            if not player.alive:
+                rewards[i] -= 20.0
         
-        return self._get_obs(), terminated, truncated
+        return (self._get_obs(), rewards, terminated, truncated)
     
     def _get_explosion_tiles(self, bomb):
         tiles = {(bomb.x, bomb.y)}
