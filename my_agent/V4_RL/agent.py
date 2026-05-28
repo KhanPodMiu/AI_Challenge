@@ -15,7 +15,7 @@ class Agent:
 
         self.model.load_state_dict(
             torch.load(
-                "model.pth",
+                "final_model.pth",
                 map_location=torch.device("cpu")
             )
         )

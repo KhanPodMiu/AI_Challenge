@@ -30,7 +30,9 @@ from agent import (
 )
 
 
+# =========================
 # DEVICE
+# =========================
 
 if torch.backends.mps.is_available():
 
@@ -47,40 +49,55 @@ else:
 print(f"🔥 device = {device}")
 
 
+# =========================
+# PATHS
+# =========================
+
+SAVE_DIR = "./checkpoints"
+
+os.makedirs(SAVE_DIR, exist_ok=True)
+
+CHECKPOINT_PATH = os.path.join(
+    SAVE_DIR,
+    "latest_checkpoint.pth"
+)
+
+BEST_MODEL_PATH = os.path.join(
+    SAVE_DIR,
+    "best_model.pth"
+)
+
+
+# =========================
+# ENV
+# =========================
+
 env = BomberEnv()
 
+
+# =========================
 # ENEMY BOTS
+# =========================
 
 enemy_bots = [
-    SimpleRuleAgent(1),
-    SimpleRuleAgent(2),
+    RandomAgent(a1),
+    RandomAgent(2),
     RandomAgent(3)
 ]
 
 
+# =========================
 # MODEL
+# =========================
 
 model = CNNModel().to(device)
-
-
-# LOAD MODEL
-
-if os.path.exists("model.pth"):
-
-    model.load_state_dict(
-        torch.load(
-            "model.pth",
-            map_location=device,
-            weights_only=False
-        )
-    )
-
-    print("✅ old model loaded")
 
 model.train()
 
 
+# =========================
 # OPTIMIZER
+# =========================
 
 optimizer = torch.optim.Adam(
     model.parameters(),
@@ -88,7 +105,9 @@ optimizer = torch.optim.Adam(
 )
 
 
+# =========================
 # TRAINER
+# =========================
 
 trainer = Trainer(
     model,
@@ -97,29 +116,81 @@ trainer = Trainer(
 )
 
 
+# =========================
 # REPLAY BUFFER
+# =========================
 
 buffer = ReplayBuffer(
     capacity=50000
 )
 
 
+# =========================
+# TRAIN CONFIG
+# =========================
 
-episodes = 100
+episodes = 50
 
 batch_size = 64
 
 epsilon = 1.0
+
 epsilon_min = 0.05
+
 epsilon_decay = 0.9995
 
 max_steps = 500
 
+start_episode = 0
+
+best_reward = -999999
 
 
-for episode in range(episodes):
+# =========================
+# LOAD CHECKPOINT
+# =========================
 
-    # reset env
+if os.path.exists(CHECKPOINT_PATH):
+
+    print("📦 loading checkpoint...")
+
+    checkpoint = torch.load(
+        CHECKPOINT_PATH,
+        map_location=device
+    )
+
+    model.load_state_dict(
+        checkpoint["model_state_dict"]
+    )
+
+    optimizer.load_state_dict(
+        checkpoint["optimizer_state_dict"]
+    )
+
+    epsilon = checkpoint["epsilon"]
+
+    start_episode = checkpoint["episode"] + 1
+
+    best_reward = checkpoint["best_reward"]
+
+    print(
+        f"✅ resumed from episode {start_episode}"
+    )
+
+else:
+
+    print("🆕 starting new training")
+
+
+# =========================
+# TRAIN LOOP
+# =========================
+
+for episode in range(
+    start_episode,
+    episodes
+):
+
     obs = env.reset()
 
     done = False
@@ -134,7 +205,6 @@ for episode in range(episodes):
 
         step += 1
 
-
         state = encode_obs(obs, 0)
 
         state_tensor = torch.tensor(
@@ -142,7 +212,9 @@ for episode in range(episodes):
             dtype=torch.float32
         ).unsqueeze(0).to(device)
 
-        # GET MY ACTION
+        # =========================
+        # GET ACTION
+        # =========================
 
         with torch.no_grad():
 
@@ -160,24 +232,23 @@ for episode in range(episodes):
                 dim=1
             ).item()
 
+        # =========================
         # ENEMY ACTIONS
+        # =========================
 
         enemy_actions = []
 
-        for i, bot in enumerate(enemy_bots):
+        for bot in enemy_bots:
 
             try:
 
-                enemy_obs = obs
-
-                # try different function names
                 if hasattr(bot, "act"):
 
-                    enemy_action = bot.act(enemy_obs)
+                    enemy_action = bot.act(obs)
 
                 elif hasattr(bot, "get_action"):
 
-                    enemy_action = bot.get_action(enemy_obs)
+                    enemy_action = bot.get_action(obs)
 
                 else:
 
@@ -191,9 +262,11 @@ for episode in range(episodes):
 
             enemy_actions.append(enemy_action)
 
-
         actions = [my_action] + enemy_actions
 
+        # =========================
+        # ENV STEP
+        # =========================
 
         next_obs, rewards, terminated, truncated = env.step(actions)
 
@@ -201,10 +274,11 @@ for episode in range(episodes):
 
         done = terminated or truncated
 
-
         next_state = encode_obs(next_obs, 0)
 
+        # =========================
         # SAVE EXPERIENCE
+        # =========================
 
         buffer.push(
             state,
@@ -216,7 +290,9 @@ for episode in range(episodes):
 
         total_reward += reward
 
-        # TRAIN MODEL
+        # =========================
+        # TRAIN
+        # =========================
 
         if len(buffer) >= batch_size:
 
@@ -224,18 +300,20 @@ for episode in range(episodes):
 
             loss = trainer.train_step(batch)
 
-        # UPDATE OBS
-
         obs = next_obs
 
+    # =========================
     # EPSILON DECAY
+    # =========================
 
     epsilon = max(
         epsilon_min,
         epsilon * epsilon_decay
     )
 
+    # =========================
     # LOSS VALUE
+    # =========================
 
     if torch.is_tensor(loss):
 
@@ -245,7 +323,9 @@ for episode in range(episodes):
 
         loss_value = loss
 
+    # =========================
     # LOG
+    # =========================
 
     print(
         f"[EP {episode:05d}] | "
@@ -256,19 +336,52 @@ for episode in range(episodes):
         f"Buffer: {len(buffer)}"
     )
 
-    # SAVE CHECKPOINT
+    # =========================
+    # SAVE BEST MODEL
+    # =========================
 
-    if episode > 0 and episode % 10 == 0:
+    if total_reward > best_reward:
+
+        best_reward = total_reward
 
         torch.save(
             model.state_dict(),
-            "model.pth"
+            BEST_MODEL_PATH
         )
+
+        print("🏆 best model updated")
+
+    # =========================
+    # SAVE CHECKPOINT
+    # =========================
+
+    if episode > 0 and episode % 10 == 0:
+
+        torch.save({
+
+            "model_state_dict":
+                model.state_dict(),
+
+            "optimizer_state_dict":
+                optimizer.state_dict(),
+
+            "epsilon":
+                epsilon,
+
+            "episode":
+                episode,
+
+            "best_reward":
+                best_reward,
+
+        }, CHECKPOINT_PATH)
 
         print("💾 checkpoint saved")
 
 
+# =========================
 # FINAL SAVE
+# =========================
 
 torch.save(
     model.state_dict(),

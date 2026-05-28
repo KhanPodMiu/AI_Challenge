@@ -81,3 +81,18 @@ dist/
 bin/
 
 Miniconda3-latest-MacOSX-arm64.sh
+
+# checkpoints
+checkpoints/
+*.pth
+
+# training logs
+logs/
+*.log
+
+# python cache
+__pycache__/
+*.pyc
+
+# jupyter
+.ipynb_checkpoints/
