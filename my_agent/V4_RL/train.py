@@ -21,47 +21,73 @@ from trainer import Trainer
 from engine.game import BomberEnv
 
 
-# device
-device = torch.device(
-    "cuda"
-    if torch.cuda.is_available()
-    else "cpu"
-)
+# =========================================================
+# DEVICE
+# =========================================================
 
-print(f"device = {device}")
+if torch.backends.mps.is_available():
+
+    device = torch.device("mps")
+
+elif torch.cuda.is_available():
+
+    device = torch.device("cuda")
+
+else:
+
+    device = torch.device("cpu")
+
+print(f"🔥 device = {device}")
 
 
-# env
+# =========================================================
+# ENVIRONMENT
+# =========================================================
+
 env = BomberEnv()
 
 
-# model
+# =========================================================
+# MODEL
+# =========================================================
+
 model = CNNModel().to(device)
 
-# load old model
+
+# =========================================================
+# LOAD MODEL
+# =========================================================
+
 if os.path.exists("model.pth"):
 
     model.load_state_dict(
         torch.load(
             "model.pth",
-            map_location=device
+            map_location=device,
+            weights_only=False
         )
     )
 
-    print("model loaded")
+    print("✅ old model loaded")
 
 
 model.train()
 
 
-# optimizer
+# =========================================================
+# OPTIMIZER
+# =========================================================
+
 optimizer = torch.optim.Adam(
     model.parameters(),
     lr=1e-4
 )
 
 
-# trainer
+# =========================================================
+# TRAINER
+# =========================================================
+
 trainer = Trainer(
     model,
     optimizer,
@@ -69,30 +95,57 @@ trainer = Trainer(
 )
 
 
-# replay buffer
+# =========================================================
+# REPLAY BUFFER
+# =========================================================
+
 buffer = ReplayBuffer(
-    capacity=100000
+    capacity=50000
 )
 
 
-# exploration
-epsilon = 0.2
+# =========================================================
+# HYPERPARAMETERS
+# =========================================================
+
+episodes = 10000
+
+batch_size = 64
+
+gamma = 0.99
+
+epsilon = 1.0
+epsilon_min = 0.05
+epsilon_decay = 0.995
+
+max_steps = 300
 
 
-# training
-for episode in range(100):
+# =========================================================
+# TRAINING LOOP
+# =========================================================
 
+for episode in range(episodes):
+
+    # reset env
     obs = env.reset()
 
     done = False
 
-    total_reward = 0
+    total_reward = 0.0
 
     loss = 0.0
 
-    while not done:
+    step = 0
 
-        # encode state
+    while not done and step < max_steps:
+
+        step += 1
+
+        # =================================================
+        # ENCODE STATE
+        # =================================================
+
         state = encode_obs(obs, 0)
 
         state_tensor = torch.tensor(
@@ -100,12 +153,15 @@ for episode in range(100):
             dtype=torch.float32
         ).unsqueeze(0).to(device)
 
-        # predict q-values
+        # =================================================
+        # GET ACTION
+        # =================================================
+
         with torch.no_grad():
 
             q_values = model(state_tensor)
 
-        # epsilon-greedy
+        # epsilon greedy
         if random.random() < epsilon:
 
             action = random.randint(0, 5)
@@ -113,10 +169,14 @@ for episode in range(100):
         else:
 
             action = torch.argmax(
-                q_values
+                q_values,
+                dim=1
             ).item()
 
-        # other bots random
+        # =================================================
+        # OTHER PLAYERS
+        # =================================================
+
         actions = [
             action,
             random.randint(0, 5),
@@ -124,17 +184,26 @@ for episode in range(100):
             random.randint(0, 5)
         ]
 
-        # game step
+        # =================================================
+        # STEP ENV
+        # =================================================
+
         next_obs, rewards, terminated, truncated = env.step(actions)
 
         reward = rewards[0]
 
         done = terminated or truncated
 
-        # encode next state
+        # =================================================
+        # NEXT STATE
+        # =================================================
+
         next_state = encode_obs(next_obs, 0)
 
-        # save memory
+        # =================================================
+        # SAVE TO BUFFER
+        # =================================================
+
         buffer.push(
             state,
             action,
@@ -145,32 +214,60 @@ for episode in range(100):
 
         total_reward += reward
 
-        # train
-        if len(buffer) > 64:
+        # =================================================
+        # TRAIN
+        # =================================================
 
-            batch = buffer.sample(64)
+        if len(buffer) >= batch_size:
+
+            batch = buffer.sample(batch_size)
 
             loss = trainer.train_step(batch)
 
-        # next obs
+        # =================================================
+        # UPDATE OBS
+        # =================================================
+
         obs = next_obs
 
-    # epsilon decay
+    # =====================================================
+    # EPSILON DECAY
+    # =====================================================
+
     epsilon = max(
-        0.05,
-        epsilon * 0.9995
+        epsilon_min,
+        epsilon * epsilon_decay
     )
 
-    # print training info
+    # =====================================================
+    # LOSS VALUE
+    # =====================================================
+
+    if torch.is_tensor(loss):
+
+        loss_value = loss.item()
+
+    else:
+
+        loss_value = loss
+
+    # =====================================================
+    # LOG
+    # =====================================================
+
     print(
-        f"[EP {episode:05d}] "
+        f"[EP {episode:05d}] | "
         f"Reward: {total_reward:8.2f} | "
         f"Epsilon: {epsilon:.3f} | "
-        f"Loss: {loss:.4f} | "
+        f"Loss: {loss_value:.4f} | "
+        f"Steps: {step:03d} | "
         f"Buffer: {len(buffer)}"
     )
 
-    # save model
+    # =====================================================
+    # SAVE MODEL
+    # =====================================================
+
     if episode % 100 == 0:
 
         torch.save(
@@ -178,4 +275,16 @@ for episode in range(100):
             "model.pth"
         )
 
-        print("🔥 model saved 🔥")
+        print("💾 checkpoint saved")
+
+
+# =========================================================
+# FINAL SAVE
+# =========================================================
+
+torch.save(
+    model.state_dict(),
+    "final_model.pth"
+)
+
+print("✅ final model saved")

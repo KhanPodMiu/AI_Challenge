@@ -56,6 +56,8 @@ Temporary Items
 .env
 .env.local
 
+model.pth
+
 # Node.js
 node_modules/
 npm-debug.log*

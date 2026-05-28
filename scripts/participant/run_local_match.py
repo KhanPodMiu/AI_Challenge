@@ -119,7 +119,7 @@ def run_match(agent_paths, num_episodes=10, max_steps=500, seed=None):
                     action = 0
                 actions.append(action)
                 
-            obs, terminated, truncated = env.step(actions)
+            obs, _, terminated, truncated = env.step(actions)
             done = terminated or truncated
             step += 1
 
