@@ -30,10 +30,6 @@ from agent import (
 )
 
 
-# =========================
-# DEVICE
-# =========================
-
 if torch.backends.mps.is_available():
 
     device = torch.device("mps")
@@ -49,13 +45,24 @@ else:
 print(f"🔥 device = {device}")
 
 
-# =========================
-# PATHS
-# =========================
+# LOCAL
 
-SAVE_DIR = "./checkpoints"
+# SAVE_DIR = "./checkpoints"
+
+# MODELS_DIR = "./models"
+
+
+# COLAB
+
+SAVE_DIR = "/content/drive/MyDrive/bomber_rl_shared/checkpoints"
+
+MODELS_DIR = "/content/drive/MyDrive/bomber_rl_shared/models"
+
 
 os.makedirs(SAVE_DIR, exist_ok=True)
+
+os.makedirs(MODELS_DIR, exist_ok=True)
+
 
 CHECKPOINT_PATH = os.path.join(
     SAVE_DIR,
@@ -63,51 +70,36 @@ CHECKPOINT_PATH = os.path.join(
 )
 
 BEST_MODEL_PATH = os.path.join(
-    SAVE_DIR,
+    MODELS_DIR,
     "best_model.pth"
 )
 
+FINAL_MODEL_PATH = os.path.join(
+    MODELS_DIR,
+    "final_model.pth"
+)
 
-# =========================
-# ENV
-# =========================
 
 env = BomberEnv()
 
 
-# =========================
-# ENEMY BOTS
-# =========================
-
 enemy_bots = [
-    RandomAgent(a1),
-    RandomAgent(2),
-    RandomAgent(3)
+    SimpleRuleAgent(1),
+    BoxFarmerAgent(2),
+    SimpleRuleAgent(3)
 ]
 
-
-# =========================
-# MODEL
-# =========================
 
 model = CNNModel().to(device)
 
 model.train()
 
 
-# =========================
-# OPTIMIZER
-# =========================
-
 optimizer = torch.optim.Adam(
     model.parameters(),
     lr=1e-4
 )
 
-
-# =========================
-# TRAINER
-# =========================
 
 trainer = Trainer(
     model,
@@ -116,18 +108,10 @@ trainer = Trainer(
 )
 
 
-# =========================
-# REPLAY BUFFER
-# =========================
-
 buffer = ReplayBuffer(
     capacity=50000
 )
 
-
-# =========================
-# TRAIN CONFIG
-# =========================
 
 episodes = 50
 
@@ -145,10 +129,6 @@ start_episode = 0
 
 best_reward = -999999
 
-
-# =========================
-# LOAD CHECKPOINT
-# =========================
 
 if os.path.exists(CHECKPOINT_PATH):
 
@@ -182,10 +162,6 @@ else:
     print("🆕 starting new training")
 
 
-# =========================
-# TRAIN LOOP
-# =========================
-
 for episode in range(
     start_episode,
     episodes
@@ -212,15 +188,10 @@ for episode in range(
             dtype=torch.float32
         ).unsqueeze(0).to(device)
 
-        # =========================
-        # GET ACTION
-        # =========================
-
         with torch.no_grad():
 
             q_values = model(state_tensor)
 
-        # epsilon-greedy
         if random.random() < epsilon:
 
             my_action = random.randint(0, 5)
@@ -231,10 +202,6 @@ for episode in range(
                 q_values,
                 dim=1
             ).item()
-
-        # =========================
-        # ENEMY ACTIONS
-        # =========================
 
         enemy_actions = []
 
@@ -264,10 +231,6 @@ for episode in range(
 
         actions = [my_action] + enemy_actions
 
-        # =========================
-        # ENV STEP
-        # =========================
-
         next_obs, rewards, terminated, truncated = env.step(actions)
 
         reward = rewards[0]
@@ -275,10 +238,6 @@ for episode in range(
         done = terminated or truncated
 
         next_state = encode_obs(next_obs, 0)
-
-        # =========================
-        # SAVE EXPERIENCE
-        # =========================
 
         buffer.push(
             state,
@@ -290,10 +249,6 @@ for episode in range(
 
         total_reward += reward
 
-        # =========================
-        # TRAIN
-        # =========================
-
         if len(buffer) >= batch_size:
 
             batch = buffer.sample(batch_size)
@@ -302,18 +257,10 @@ for episode in range(
 
         obs = next_obs
 
-    # =========================
-    # EPSILON DECAY
-    # =========================
-
     epsilon = max(
         epsilon_min,
         epsilon * epsilon_decay
     )
-
-    # =========================
-    # LOSS VALUE
-    # =========================
 
     if torch.is_tensor(loss):
 
@@ -323,10 +270,6 @@ for episode in range(
 
         loss_value = loss
 
-    # =========================
-    # LOG
-    # =========================
-
     print(
         f"[EP {episode:05d}] | "
         f"Reward: {total_reward:8.2f} | "
@@ -335,10 +278,6 @@ for episode in range(
         f"Steps: {step:03d} | "
         f"Buffer: {len(buffer)}"
     )
-
-    # =========================
-    # SAVE BEST MODEL
-    # =========================
 
     if total_reward > best_reward:
 
@@ -350,10 +289,6 @@ for episode in range(
         )
 
         print("🏆 best model updated")
-
-    # =========================
-    # SAVE CHECKPOINT
-    # =========================
 
     if episode > 0 and episode % 10 == 0:
 
@@ -379,13 +314,9 @@ for episode in range(
         print("💾 checkpoint saved")
 
 
-# =========================
-# FINAL SAVE
-# =========================
-
 torch.save(
     model.state_dict(),
-    "final_model.pth"
+    FINAL_MODEL_PATH
 )
 
 print("✅ final model saved")
