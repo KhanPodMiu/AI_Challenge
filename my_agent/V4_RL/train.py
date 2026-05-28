@@ -4,14 +4,14 @@ import torch
 import sys
 import os
 
-sys.path.append(
-    os.path.abspath(
-        os.path.join(
-            os.path.dirname(__file__),
-            "../.."
-        )
+ROOT_DIR = os.path.abspath(
+    os.path.join(
+        os.path.dirname(__file__),
+        "../.."
     )
 )
+
+sys.path.insert(0, ROOT_DIR)
 
 from model import CNNModel
 from feature import encode_obs
@@ -20,10 +20,17 @@ from trainer import Trainer
 
 from engine.game import BomberEnv
 
+from agent import (
+    SimpleRuleAgent,
+    SmarterRuleAgent,
+    TacticalRuleAgent,
+    RandomAgent,
+    GeniusRuleAgent,
+    BoxFarmerAgent
+)
 
-# =========================================================
+
 # DEVICE
-# =========================================================
 
 if torch.backends.mps.is_available():
 
@@ -40,23 +47,23 @@ else:
 print(f"🔥 device = {device}")
 
 
-# =========================================================
-# ENVIRONMENT
-# =========================================================
-
 env = BomberEnv()
 
+# ENEMY BOTS
 
-# =========================================================
+enemy_bots = [
+    SimpleRuleAgent(1),
+    SimpleRuleAgent(2),
+    RandomAgent(3)
+]
+
+
 # MODEL
-# =========================================================
 
 model = CNNModel().to(device)
 
 
-# =========================================================
 # LOAD MODEL
-# =========================================================
 
 if os.path.exists("model.pth"):
 
@@ -70,13 +77,10 @@ if os.path.exists("model.pth"):
 
     print("✅ old model loaded")
 
-
 model.train()
 
 
-# =========================================================
 # OPTIMIZER
-# =========================================================
 
 optimizer = torch.optim.Adam(
     model.parameters(),
@@ -84,9 +88,7 @@ optimizer = torch.optim.Adam(
 )
 
 
-# =========================================================
 # TRAINER
-# =========================================================
 
 trainer = Trainer(
     model,
@@ -95,35 +97,25 @@ trainer = Trainer(
 )
 
 
-# =========================================================
 # REPLAY BUFFER
-# =========================================================
 
 buffer = ReplayBuffer(
     capacity=50000
 )
 
 
-# =========================================================
-# HYPERPARAMETERS
-# =========================================================
 
-episodes = 10000
+episodes = 100
 
 batch_size = 64
 
-gamma = 0.99
-
 epsilon = 1.0
 epsilon_min = 0.05
-epsilon_decay = 0.995
+epsilon_decay = 0.9995
 
-max_steps = 300
+max_steps = 500
 
 
-# =========================================================
-# TRAINING LOOP
-# =========================================================
 
 for episode in range(episodes):
 
@@ -142,9 +134,6 @@ for episode in range(episodes):
 
         step += 1
 
-        # =================================================
-        # ENCODE STATE
-        # =================================================
 
         state = encode_obs(obs, 0)
 
@@ -153,40 +142,58 @@ for episode in range(episodes):
             dtype=torch.float32
         ).unsqueeze(0).to(device)
 
-        # =================================================
-        # GET ACTION
-        # =================================================
+        # GET MY ACTION
 
         with torch.no_grad():
 
             q_values = model(state_tensor)
 
-        # epsilon greedy
+        # epsilon-greedy
         if random.random() < epsilon:
 
-            action = random.randint(0, 5)
+            my_action = random.randint(0, 5)
 
         else:
 
-            action = torch.argmax(
+            my_action = torch.argmax(
                 q_values,
                 dim=1
             ).item()
 
-        # =================================================
-        # OTHER PLAYERS
-        # =================================================
+        # ENEMY ACTIONS
 
-        actions = [
-            action,
-            random.randint(0, 5),
-            random.randint(0, 5),
-            random.randint(0, 5)
-        ]
+        enemy_actions = []
 
-        # =================================================
-        # STEP ENV
-        # =================================================
+        for i, bot in enumerate(enemy_bots):
+
+            try:
+
+                enemy_obs = obs
+
+                # try different function names
+                if hasattr(bot, "act"):
+
+                    enemy_action = bot.act(enemy_obs)
+
+                elif hasattr(bot, "get_action"):
+
+                    enemy_action = bot.get_action(enemy_obs)
+
+                else:
+
+                    enemy_action = random.randint(0, 5)
+
+            except Exception as e:
+
+                print(f"⚠️ enemy bot error: {e}")
+
+                enemy_action = random.randint(0, 5)
+
+            enemy_actions.append(enemy_action)
+
+
+        actions = [my_action] + enemy_actions
+
 
         next_obs, rewards, terminated, truncated = env.step(actions)
 
@@ -194,19 +201,14 @@ for episode in range(episodes):
 
         done = terminated or truncated
 
-        # =================================================
-        # NEXT STATE
-        # =================================================
 
         next_state = encode_obs(next_obs, 0)
 
-        # =================================================
-        # SAVE TO BUFFER
-        # =================================================
+        # SAVE EXPERIENCE
 
         buffer.push(
             state,
-            action,
+            my_action,
             reward,
             next_state,
             done
@@ -214,9 +216,7 @@ for episode in range(episodes):
 
         total_reward += reward
 
-        # =================================================
-        # TRAIN
-        # =================================================
+        # TRAIN MODEL
 
         if len(buffer) >= batch_size:
 
@@ -224,24 +224,18 @@ for episode in range(episodes):
 
             loss = trainer.train_step(batch)
 
-        # =================================================
         # UPDATE OBS
-        # =================================================
 
         obs = next_obs
 
-    # =====================================================
     # EPSILON DECAY
-    # =====================================================
 
     epsilon = max(
         epsilon_min,
         epsilon * epsilon_decay
     )
 
-    # =====================================================
     # LOSS VALUE
-    # =====================================================
 
     if torch.is_tensor(loss):
 
@@ -251,9 +245,7 @@ for episode in range(episodes):
 
         loss_value = loss
 
-    # =====================================================
     # LOG
-    # =====================================================
 
     print(
         f"[EP {episode:05d}] | "
@@ -264,11 +256,9 @@ for episode in range(episodes):
         f"Buffer: {len(buffer)}"
     )
 
-    # =====================================================
-    # SAVE MODEL
-    # =====================================================
+    # SAVE CHECKPOINT
 
-    if episode % 100 == 0:
+    if episode > 0 and episode % 10 == 0:
 
         torch.save(
             model.state_dict(),
@@ -278,9 +268,7 @@ for episode in range(episodes):
         print("💾 checkpoint saved")
 
 
-# =========================================================
 # FINAL SAVE
-# =========================================================
 
 torch.save(
     model.state_dict(),
