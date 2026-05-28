@@ -80,7 +80,7 @@ epsilon = 0.2
 
 
 # training
-for episode in range(300):
+for episode in range(100):
 
     obs = env.reset()
 
