@@ -1,5 +1,6 @@
 import torch
 import torch.nn.functional as F
+import numpy as np
 
 
 class Trainer:
@@ -31,7 +32,6 @@ class Trainer:
         next_states = []
         dones = []
 
-        # unpack batch
         for (
             state,
             action,
@@ -41,16 +41,18 @@ class Trainer:
         ) in batch:
 
             states.append(state)
+
             actions.append(action)
+
             rewards.append(reward)
+
             next_states.append(next_state)
+
             dones.append(done)
 
-        # to tensor
-        states = torch.tensor(
-            states,
-            dtype=torch.float32
-        ).to(self.device)
+        states = torch.from_numpy(
+            np.array(states)
+        ).float().to(self.device)
 
         actions = torch.tensor(
             actions,
@@ -62,17 +64,15 @@ class Trainer:
             dtype=torch.float32
         ).to(self.device)
 
-        next_states = torch.tensor(
-            next_states,
-            dtype=torch.float32
-        ).to(self.device)
+        next_states = torch.from_numpy(
+            np.array(next_states)
+        ).float().to(self.device)
 
         dones = torch.tensor(
             dones,
             dtype=torch.float32
         ).to(self.device)
 
-        # current Q values
         q_values = self.model(states)
 
         current_q = q_values.gather(
@@ -80,25 +80,21 @@ class Trainer:
             actions.unsqueeze(1)
         ).squeeze(1)
 
-        # next Q values
         with torch.no_grad():
 
             next_q = self.model(next_states)
 
             max_next_q = next_q.max(1)[0]
 
-        # target Q
         target_q = rewards + (
             1 - dones
         ) * self.gamma * max_next_q
 
-        # loss
         loss = F.mse_loss(
             current_q,
             target_q
         )
 
-        # backprop
         self.optimizer.zero_grad()
 
         loss.backward()
