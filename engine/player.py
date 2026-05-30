@@ -19,7 +19,13 @@ class Player:
         self.bombs_left = 1
         self.bomb_radius_bonus = 0
         self.stats = {'kills': 0, 'boxes': 0, 'items': 0, 'bombs': 0}
-    
+
+        # reward tracking
+        self.prev_boxes = 0
+        self.prev_items = 0
+        self.prev_kills = 0
+        self.prev_alive = True
+        
     def move(self, dx, dy, grid, players, bombs):
         if not self.alive:
             return
