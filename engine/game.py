@@ -182,7 +182,7 @@ class BomberEnv:
             player.prev_kills = player.stats["kills"]
             player.prev_alive = player.alive
 
-            return (self._get_obs(),rewards,terminated,truncated)
+        return (self._get_obs(),rewards,terminated,truncated)
     
     def _get_explosion_tiles(self, bomb):
         tiles = {(bomb.x, bomb.y)}

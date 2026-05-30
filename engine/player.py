@@ -25,7 +25,6 @@ class Player:
         self.prev_items = 0
         self.prev_kills = 0
         self.prev_alive = True
-        
     def move(self, dx, dy, grid, players, bombs):
         if not self.alive:
             return
