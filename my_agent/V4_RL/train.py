@@ -47,16 +47,16 @@ print(f"🔥 device = {device}")
 
 # LOCAL
 
-SAVE_DIR = "./checkpoints"
+# SAVE_DIR = "./checkpoints"
 
-MODELS_DIR = "./models"
+# MODELS_DIR = "./models"
 
 
 # COLAB
 
-# SAVE_DIR = "/content/drive/MyDrive/bomber_rl_shared/checkpoints"
+SAVE_DIR = "/content/drive/MyDrive/bomber_rl_shared/checkpoints"
 
-# MODELS_DIR = "/content/drive/MyDrive/bomber_rl_shared/models"
+MODELS_DIR = "/content/drive/MyDrive/bomber_rl_shared/models"
 
 
 os.makedirs(SAVE_DIR, exist_ok=True)
