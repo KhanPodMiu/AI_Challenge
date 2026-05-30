@@ -28,7 +28,7 @@ from competition.evaluation.runtime_guard import load_agent_instance
 class Viewer:
 	PLAYER_COLORS = [(220, 50, 50), (50, 50, 220), (30, 150, 30), (200, 140, 0)]
 
-	def __init__(self, width=13, height=13, cell_size=42, fps=4, panel_width=200):
+	def __init__(self, width=13, height=13, cell_size=42, fps=5, panel_width=200):
 		self.width = width
 		self.height = height
 		self.cell_size = cell_size

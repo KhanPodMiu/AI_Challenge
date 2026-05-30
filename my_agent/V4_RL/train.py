@@ -113,7 +113,7 @@ buffer = ReplayBuffer(
 )
 
 
-episodes = 50
+episodes = 500
 
 batch_size = 64
 
@@ -148,6 +148,8 @@ if os.path.exists(CHECKPOINT_PATH):
     )
 
     epsilon = checkpoint["epsilon"]
+
+    # epsilon = 0.2
 
     start_episode = checkpoint["episode"] + 1
 
