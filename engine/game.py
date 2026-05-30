@@ -139,21 +139,48 @@ class BomberEnv:
         rewards = [0.0 for _ in self.players]
 
         for i, player in enumerate(self.players):
+
+            # survival reward
             if player.alive:
                 rewards[i] += 0.01
 
-        for i, player in enumerate(self.players):
+            # box reward
+            delta_boxes = (
+                player.stats["boxes"]
+                - player.prev_boxes
+            )
 
-            rewards[i] += player.stats['boxes'] * 1.0
+            rewards[i] += delta_boxes * 0.5
 
-            rewards[i] += player.stats['items'] * 2.0
+            # item reward
+            delta_items = (
+                player.stats["items"]
+                - player.prev_items
+            )
 
-            rewards[i] += player.stats['kills'] * 10.0
+            rewards[i] += delta_items * 2.0
 
-            if not player.alive:
+            # kill reward
+            delta_kills = (
+                player.stats["kills"]
+                - player.prev_kills
+            )
+
+            rewards[i] += delta_kills * 10.0
+
+            # death penalty (only once)
+            if player.prev_alive and not player.alive:
                 rewards[i] -= 20.0
-        
-        return (self._get_obs(), rewards, terminated, truncated)
+
+            # win reward
+            if terminated and player.alive:
+                rewards[i] += 20.0
+
+            # save current stats
+            player.prev_boxes = player.stats["boxes"]
+            player.prev_items = player.stats["items"]
+            player.prev_kills = player.stats["kills"]
+            player.prev_alive = player.alive
     
     def _get_explosion_tiles(self, bomb):
         tiles = {(bomb.x, bomb.y)}

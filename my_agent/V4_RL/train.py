@@ -113,7 +113,7 @@ buffer = ReplayBuffer(
 )
 
 
-episodes = 100
+episodes = 500
 
 batch_size = 64
 
