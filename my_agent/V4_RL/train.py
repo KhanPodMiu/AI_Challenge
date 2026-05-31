@@ -1,5 +1,6 @@
 import random
 import torch
+import numpy as np
 
 import sys
 import os
@@ -113,7 +114,7 @@ buffer = ReplayBuffer(
 )
 
 
-episodes = 10000
+episodes = 500
 
 batch_size = 64
 
@@ -171,6 +172,8 @@ for episode in range(
 
     obs = env.reset()
 
+
+
     done = False
 
     total_reward = 0.0
@@ -184,6 +187,7 @@ for episode in range(
         step += 1
 
         state = encode_obs(obs, 0)
+
 
         state_tensor = torch.tensor(
             state,
@@ -240,6 +244,21 @@ for episode in range(
         done = terminated or truncated
 
         next_state = encode_obs(next_obs, 0)
+
+        my_r, my_c = obs["players"][0][:2]
+
+        next_r, next_c = next_obs["players"][0][:2]
+
+        old_danger = state[9, my_r, my_c]
+        new_danger = next_state[9, next_r, next_c]
+
+        # escape danger
+        if new_danger < old_danger:
+            reward += 0.1
+
+        elif new_danger > old_danger:
+            reward -= 0.1
+
 
         buffer.push(
             state,
